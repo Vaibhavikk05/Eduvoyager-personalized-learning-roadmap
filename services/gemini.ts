@@ -1,11 +1,39 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { Roadmap, GameQuestion, AssessmentQuestion, Job, Task } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Helper to safely get the API key in various environments (Vite, CRA, etc.)
+const getApiKey = (): string => {
+  // Check for Vite environment variable
+  // @ts-ignore
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_KEY) {
+    // @ts-ignore
+    return import.meta.env.VITE_API_KEY;
+  }
+  // Check for standard process.env (Webpack/Node)
+  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+    return process.env.API_KEY;
+  }
+  return '';
+};
+
+const apiKey = getApiKey();
+const ai = new GoogleGenAI({ apiKey: apiKey });
 
 const modelId = "gemini-3-flash-preview";
 
 export const generateAssessmentQuestions = async (designation: string, domain: string, age: number): Promise<AssessmentQuestion[]> => {
+  if (!apiKey) {
+      console.error("API Key is missing. Please check your environment variables.");
+      // Return fallback immediately if no key to prevent crash
+      return [
+        { question: `What is your current experience with ${domain}?`, options: ["Complete Beginner", "Basic Knowledge", "Intermediate", "Advanced"], allowMultiple: false },
+        { question: "How much time can you dedicate daily?", options: ["Less than 1 hour", "1-2 hours", "2-4 hours", "Full time"], allowMultiple: false },
+        { question: "What are your preferred learning styles?", options: ["Video", "Reading", "Projects"], allowMultiple: true },
+        { question: "What is your goal?", options: ["Job", "Hobby", "School"], allowMultiple: false },
+        { question: "Budget?", options: ["Free", "Paid"], allowMultiple: false }
+      ];
+  }
+
   const prompt = `
     Context: A user (Designation: ${designation}, Age: ${age}) wants to pursue a goal/domain in: "${domain}".
     
@@ -129,6 +157,7 @@ export const generateRoadmap = async (
   userProfile: any,
   answers: { question: string; answer: string }[]
 ): Promise<Roadmap> => {
+  if (!apiKey) throw new Error("API Key missing");
   
   const designation = userProfile.designation || "Learner";
   const domain = userProfile.domain || "General Skills";
@@ -225,6 +254,7 @@ export const generateNextLevelRoadmap = async (
   currentRoadmap: Roadmap,
   nextFocus: string,
 ): Promise<Roadmap> => {
+  if (!apiKey) throw new Error("API Key missing");
   
   const nextLevel = Math.min(10, currentRoadmap.targetNsqfLevel + 1);
   const prompt = `
@@ -291,6 +321,8 @@ export const generateNextLevelRoadmap = async (
 };
 
 export const generateGameQuestions = async (topic: string, difficulty: string): Promise<GameQuestion[]> => {
+  if (!apiKey) return [];
+  
   const prompt = `
     Generate 5 ${difficulty} difficulty aptitude or technical questions related to: "${topic}".
     These are for revision purposes.
@@ -332,6 +364,8 @@ export const generateGameQuestions = async (topic: string, difficulty: string): 
 };
 
 export const generateJobs = async (userDesignation: string, skills: string[]): Promise<Job[]> => {
+  if (!apiKey) return [];
+  
   const prompt = `
     Based on a user who is a ${userDesignation} with the following skills: ${skills.join(", ")},
     recommend 5 relevant job roles available on major job portals.
@@ -396,6 +430,8 @@ export const generateJobs = async (userDesignation: string, skills: string[]): P
 };
 
 export const generateDailyTasks = async (stepTitle: string, stepDescription: string, count: number = 3): Promise<Task[]> => {
+  if (!apiKey) return [];
+
   const prompt = `
     The user is currently working on this learning roadmap step:
     Title: "${stepTitle}"
